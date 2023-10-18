@@ -101,27 +101,29 @@ app.get("/purchases", function (req, res) {
     let sort = req.query.sort;
     let conditions = [];
     let values = [];
+    let paramCount = 1;
 
     if (product) {
         let productArr = product.split(",");
-        conditions.push("productid = ANY($1)");
+        conditions.push(`productid = ANY($${paramCount})`);
         values.push(productArr);
+        paramCount++;
+    }
+
+    if (shop) {
+        conditions.push(`shopid = $${paramCount}`);
+        values.push(shop);
+        paramCount++;
     }
 
     let sql = `SELECT * FROM purchases`;
-    
-    if (shop) {
-        conditions.push("shopid=$2");
-        values.push(shop);
-    }
-
     if (conditions.length > 0) {
         sql += ` WHERE ` + conditions.join(" AND ");
     }
 
     if (sort) {
         if (sort === "QtyAsc") {
-            sql += ` ORDER BY quantity ASC `;
+            sql += ` ORDER BY quantity ASC`;
         } else if (sort === "QtyDesc") {
             sql += ` ORDER BY quantity DESC`;
         } else if (sort === "ValueAsc") {
@@ -130,11 +132,15 @@ app.get("/purchases", function (req, res) {
             sql += ` ORDER BY price * quantity DESC`;
         }
     }
+
+    console.log(sql, values);
     client.query(sql, values, function (err, result) {
         if (err) res.status(404).send("No Data Found");
         else res.send(result.rows);
     });
 });
+
+
 
 app.get("/purchases/shops/:shopid",function(req,res){
     let shopid=req.params.shopid;
