@@ -13,157 +13,283 @@ app.use(function (req, res, next) {
   );
   next();
 });
-var port = process.env.PORT||2410;
+const port = 2410;
 app.listen(port, () => console.log(`Node app listening on port ${port}!`));
 
-const { Client } = require("pg");
-const client = new Client({
-    user:"postgres",
-    password:"62653903220906",
-    database:"postgres",
-    port:5432,
-    host:"db.xmrxwivrxbqrqwcznjat.supabase.co",
-    ssl: { rejectUnauthorized:false },
-});
-client.connect(function(err,result){
-    console.log("Connected !!")
-})
+let fs=require("fs");
+let fname="shop.json";
+let {data}=require("./ShopData");
+
 
 app.get("/shops",function(req,res){
-    let sql=`SELECT * FROM shops`;
-    client.query(sql,function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
+    let data1=JSON.stringify(data);
+    fs.writeFile(fname,data1,function(err,content){
+        if(err) res.status(404).send(err);
+        else{
+            fs.readFile(fname,"utf8",function(err,content){
+                if(err) res.status(404).send("No Data Found");
+                else{
+                    let arr=JSON.parse(content);
+                    res.send(arr.data.shops);
+                }
+            })
+        }
     })
 });
 app.post("/shops",function(req,res){
-    let body=Object.values(req.body);
-    let sql=`INSERT INTO shops(name,rent) VALUES ($1,$2)`;
-    client.query(sql,body,function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send("Inserted Successfully !");
+    let body=req.body;
+    fs.readFile(fname,"utf8",function(err,content){
+        if(err) res.status(404).send(err);
+        else{
+            let arr=JSON.parse(content);
+            let maxId=arr.data.shops.reduce((acc,curr)=>curr.shopId>acc?curr.shopId:acc, 0);
+            let newId=maxId+1;
+            let shop={shopId:newId,...body};
+            arr.data.shops.push(shop);
+            let data1=JSON.stringify(arr);
+            fs.writeFile(fname,data1,function(err,content){
+                if(err) res.status(404).send(err);
+                else res.send("Successfully Inserted !!");
+            })
+        }
     })
 });
-
-app.get("/totalpurchase/product/:productid",function(req,res){
-    let productid=req.params.productid;
-    let sql=`SELECT shopid, productid, SUM(quantity * price) as TotalPurchase FROM purchases WHERE productid = $1 GROUP BY shopid, productid`;
-    client.query(sql,[productid],function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
-    })
-})
 
 app.get("/products",function(req,res){
-    let sql=`SELECT * FROM products`;
-    client.query(sql,function(err,result){
+    fs.readFile(fname,"utf8",function(err,content){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
+        else{
+            let arr=JSON.parse(content);
+            res.send(arr.data.products);
+        }
     })
+});
+app.get("/products/:productName",function (req,res) {
+  let productName = req.params.productName;
+  fs.readFile(fname,"utf8",function(err,content){
+    if (err) {
+      res.send(err);
+    } else {
+      let data1 = JSON.parse(content);
+      let prod = data1.data.products.find((a) => a.productName === productName);
+      if (prod) {
+        res.send(prod);
+      } else {
+        res.status(404).send("No Data Found");
+      }
+    }
+  });
 });
 app.post("/products",function(req,res){
-    let body=Object.values(req.body);
-    let sql="INSERT INTO products(productname,category,description) VALUES ($1,$2,$3)";
-    client.query(sql,body,function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send("Inserted Successfully !");
-    })
-});
-app.get("/products/:id",function(req,res){
-    let id=req.params.id;
-    let sql=`SELECT * FROM products WHERE productid=$1`;
-    client.query(sql,[id],function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
-    })
-});
-app.put("/products/:name",function(req,res){
-    let name=req.params.name;
     let body=req.body;
-    let sql=`UPDATE products SET category=$1,description=$2 WHERE productname=$3`;
-    client.query(sql,[body.category,body.description,name],function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send("Updated Successfully !");
+    fs.readFile(fname,"utf8",function(err,content){
+        if(err) res.status(404).send(err);
+        else{
+            let arr=JSON.parse(content);
+            let maxId=arr.data.products.reduce((acc,curr)=>curr.productId>acc?curr.productId:acc, 0);
+            let newId=maxId+1;
+            let product={productId:newId,...body};
+            arr.data.products.push(product);
+            let data1=JSON.stringify(arr);
+            fs.writeFile(fname,data1,function(err,content){
+                if(err) res.status(404).send(err);
+                else res.send("Successfully Inserted !!");
+            })
+        }
     })
 });
-app.get("/totalpurchase/shop/:shopid",function(req,res){
-    let shopid=req.params.shopid;
-    let sql=`SELECT shopid,productid,SUM(quantity*price) as TotalPurchase FROM purchases WHERE shopid=$1 GROUP BY productid,shopid`;
-    client.query(sql,[shopid],function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
+app.put("/products/:productid",function(req,res){
+    let productid=+req.params.productid;
+    let body=req.body;
+    fs.readFile(fname,"utf8",function(err,content){
+        if(err) res.status(404).send(err);
+        else{
+            let arr=JSON.parse(content);
+            let index=arr.data.products.findIndex((a)=>a.productId===productid);
+            if(index>=0){
+                let updated={productId:productid, ...body};
+                arr.data.products[index]=updated;
+                let data1=JSON.stringify(arr);
+                fs.writeFile(fname,data1,function(err,content){
+                    if(err) res.status(404).send(err);
+                    else res.send(updated);
+                })
+            }else res.status(404).send("No Data Found");
+        }
     })
 });
 
 app.get("/purchases", function (req, res) {
     let product = req.query.product;
-    let shop = req.query.shop;
+    let shop = +req.query.shop;
     let sort = req.query.sort;
-    let conditions = [];
-    let values = [];
-    let paramCount = 1;
-
+  
     if (product) {
-        let productArr = product.split(",");
-        conditions.push(`productid = ANY($${paramCount})`);
-        values.push(productArr);
-        paramCount++;
-    }
-
-    if (shop) {
-        conditions.push(`shopid = $${paramCount}`);
-        values.push(shop);
-        paramCount++;
-    }
-
-    let sql = `SELECT * FROM purchases`;
-    if (conditions.length > 0) {
-        sql += ` WHERE ` + conditions.join(" AND ");
-    }
-
-    if (sort) {
-        if (sort === "QtyAsc") {
-            sql += ` ORDER BY quantity ASC`;
-        } else if (sort === "QtyDesc") {
-            sql += ` ORDER BY quantity DESC`;
-        } else if (sort === "ValueAsc") {
-            sql += ` ORDER BY price * quantity ASC`;
-        } else if (sort === "ValueDesc") {
-            sql += ` ORDER BY price * quantity DESC`;
+      let productIds = product.split(",").map(Number);
+      fs.readFile(fname, "utf8", function (err, content) {
+        if (err) res.status(404).send(err);
+        else {
+          let arr = JSON.parse(content);
+          let arr1 = arr.data.purchases.filter((a) => productIds.includes(a.productid));
+          if (arr1) res.send(arr1);
+          else res.status(404).send("No Data Found");
         }
-    }
-
-    console.log(sql, values);
-    client.query(sql, values, function (err, result) {
+      });
+    } else if (shop) {
+      fs.readFile(fname, "utf8", function (err, content) {
+        if (err) res.status(404).send(err);
+        else {
+          let arr = JSON.parse(content);
+          let arr1 = arr.data.purchases.filter((a) => a.shopId === shop);
+          if (arr1) res.send(arr1);
+          else res.status(404).send("No Data Found");
+        }
+      });
+    } else if (sort) {
+      fs.readFile(fname, "utf8", function (err, content) {
+        if (err) res.status(404).send(err);
+        else {
+          let arr = JSON.parse(content);
+          let sortedPurchases;
+  
+          if (sort === "QtyAsc") {
+            sortedPurchases = [...arr.data.purchases].sort((a, b) => a.quantity - b.quantity);
+          } else if (sort === "QtyDesc") {
+            sortedPurchases = [...arr.data.purchases].sort((a, b) => b.quantity - a.quantity);
+          } else if (sort === "ValueAsc") {
+            sortedPurchases = [...arr.data.purchases].sort((a, b) => a.quantity * a.price - b.quantity * b.price);
+          } else if (sort === "ValueDesc") {
+            sortedPurchases = [...arr.data.purchases].sort((a, b) => b.quantity * b.price - a.quantity * a.price);
+          }
+  
+          res.send(sortedPurchases);
+        }
+      });
+    } else {
+      fs.readFile(fname, "utf8", function (err, content) {
         if (err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
-    });
-});
-
-
-
+        else {
+          let arr = JSON.parse(content);
+          res.send(arr.data.purchases);
+        }
+      });
+    }
+  });
+  
 app.get("/purchases/shops/:shopid",function(req,res){
-    let shopid=req.params.shopid;
-    let sql="SELECT * FROM purchases WHERE shopid=$1";
-    client.query(sql,[shopid],function(err,result){
+    let shopid=+req.params.shopid;
+    fs.readFile(fname,"utf8",function(err,content){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
+        else{
+            let arr=JSON.parse(content);
+            let purchase=arr.data.purchases.filter((a)=>a.shopId===shopid);
+            if(purchase)  res.send(purchase);
+            else res.send("No Data Found");
+        }
     })
 });
 app.get("/purchases/products/:productid",function(req,res){
-    let productid=req.params.productid;
-    let sql="SELECT * FROM purchases WHERE productid=$1";
-    client.query(sql,[productid],function(err,result){
+    let productid=+req.params.productid;
+    fs.readFile(fname,"utf8",function(err,content){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result.rows);
-    })
-});
-app.post("/purchases",function(req,res){
-    let body=Object.values(req.body);
-    let sql="INSERT INTO purchases(shopid,productid,quantity,price) VALUES ($1,$2,$3,$4)";
-    client.query(sql,body,function(err,result){
-        if(err) res.status(404).send("No Data Found");
-        else res.send("Inserted Successfully !");
+        else{
+            let arr=JSON.parse(content);
+            let purchase=arr.data.purchases.filter((a)=>a.productid===productid);
+            if(purchase)  res.send(purchase);
+            else res.send("No Data Found");
+        }
     })
 });
 
+app.get("/totalPurchase/shop/:shopid", function (req, res) {
+    const shopId = +req.params.shopid;
+  
+    fs.readFile(fname, "utf8", function (err, content) {
+      if (err) {
+        res.status(404).send(err);
+      } else {
+        const arr = JSON.parse(content);
+        const purchases = arr.data.purchases.filter((a) => a.shopId === shopId);
+  
+        if (purchases.length > 0) {
+          const productTotals = purchases.reduce((totals, purchase) => {
+            const { productid,quantity, price, shopId } = purchase;
+  
+            if (!totals[productid]) {
+              totals[productid] = {
+                productid: productid,
+                value: 0,
+                shopId: shopId,
+              };
+            }
+
+            totals[productid].value += quantity * price;
+  
+            return totals;
+          }, {});
+  
+          const result = Object.values(productTotals);
+  
+          res.send(result);
+        } else {
+          res.status(404).send("No Data Found");
+        }
+      }
+    });
+  });
+  
+app.get("/totalPurchase/product/:productid", function (req, res) {
+    const productId = +req.params.productid;
+  
+    fs.readFile(fname, "utf8", function (err, content) {
+      if (err) {
+        res.status(404).send(err);
+      } else {
+        const arr = JSON.parse(content);
+        const purchases = arr.data.purchases.filter((a) => a.productid === productId);
+  
+        if (purchases.length > 0) {
+          const shopTotals = purchases.reduce((totals, purchase) => {
+            const { shopId,quantity, price, productid } = purchase;
+  
+            if (!totals[shopId]) {
+              totals[shopId] = {
+                shopId: shopId,
+                productid: productid,
+                value: 0,
+              };
+            }
+  
+            totals[shopId].value += quantity * price;
+  
+            return totals;
+          }, {});
+  
+          const result = Object.values(shopTotals);
+  
+          res.send(result);
+        } else {
+          res.status(404).send("No Data Found");
+        }
+      }
+    });
+  });
+  
+  app.post("/purchases",function(req,res){
+    let body=req.body;
+    fs.readFile(fname,"utf8",function(err,content){
+        if(err) res.status(404).send(err);
+        else{
+            let arr=JSON.parse(content);
+            let maxId=arr.data.purchases.reduce((acc,curr)=>curr.productId>acc?curr.productId:acc, 0);
+            let newId=maxId+1;
+            let product={purchaseId:newId,...body};
+            arr.data.purchases.push(product);
+            let data1=JSON.stringify(arr);
+            fs.writeFile(fname,data1,function(err,content){
+                if(err) res.status(404).send(err);
+                else res.send("Successfully Inserted !!");
+            })
+        }
+    })
+});
