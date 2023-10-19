@@ -13,30 +13,33 @@ app.use(function (req, res, next) {
   );
   next();
 });
-const port = 2410;
+var port = process.env.PORT||2410;
 app.listen(port, () => console.log(`Node app listening on port ${port}!`));
 
-let mysql=require("mysql");
-let connData=({
-    host:"localhost",
-    user:"root",
-    password:"",
-    database:"testdb",
+const { Client } = require("pg");
+const client = new Client({
+    user:"postgres",
+    password:"62653903220906",
+    database:"postgres",
+    port:5432,
+    host:"db.xmrxwivrxbqrqwcznjat.supabase.co",
+    ssl: { rejectUnauthorized:false },
 });
+client.connect(function(err,result){
+    console.log("Connected !!")
+})
 
 app.get("/shops",function(req,res){
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT * FROM shops";
-    connection.query(sql,function(err,result){
+    let sql=`SELECT * FROM shops`;
+    client.query(sql,function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 app.post("/shops",function(req,res){
     let body=Object.values(req.body);
-    let connection=mysql.createConnection(connData);
-    let sql="INSERT INTO shops(name,rent) VALUES (?,?)";
-    connection.query(sql,body,function(err,result){
+    let sql=`INSERT INTO shops(name,rent) VALUES ($1,$2)`;
+    client.query(sql,body,function(err,result){
         if(err) res.status(404).send("No Data Found");
         else res.send("Inserted Successfully !");
     })
@@ -44,57 +47,51 @@ app.post("/shops",function(req,res){
 
 app.get("/totalpurchase/product/:productid",function(req,res){
     let productid=req.params.productid;
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT shopid,productid,SUM(quantity*price) as TotalPurchase FROM purchases WHERE productid=? GROUP BY shopid";
-    connection.query(sql,productid,function(err,result){
+    let sql=`SELECT shopid, productid, SUM(quantity * price) as TotalPurchase FROM purchases WHERE productid = $1 GROUP BY shopid, productid`;
+    client.query(sql,[productid],function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 })
 
 app.get("/products",function(req,res){
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT * FROM products";
-    connection.query(sql,function(err,result){
+    let sql=`SELECT * FROM products`;
+    client.query(sql,function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 app.post("/products",function(req,res){
     let body=Object.values(req.body);
-    let connection=mysql.createConnection(connData);
-    let sql="INSERT INTO products(productname,category,description) VALUES (?,?,?)";
-    connection.query(sql,body,function(err,result){
+    let sql="INSERT INTO products(productname,category,description) VALUES ($1,$2,$3)";
+    client.query(sql,body,function(err,result){
         if(err) res.status(404).send("No Data Found");
         else res.send("Inserted Successfully !");
     })
 });
 app.get("/products/:id",function(req,res){
     let id=req.params.id;
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT * FROM products WHERE productid=?";
-    connection.query(sql,id,function(err,result){
+    let sql=`SELECT * FROM products WHERE productid=$1`;
+    client.query(sql,[id],function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 app.put("/products/:name",function(req,res){
     let name=req.params.name;
     let body=req.body;
-    let connection=mysql.createConnection(connData);
-    let sql="UPDATE products SET ? WHERE productname=?";
-    connection.query(sql,[body,name],function(err,result){
+    let sql=`UPDATE products SET category=$1,description=$2 WHERE productname=$3`;
+    client.query(sql,[body.category,body.description,name],function(err,result){
         if(err) res.status(404).send("No Data Found");
         else res.send("Updated Successfully !");
     })
 });
 app.get("/totalpurchase/shop/:shopid",function(req,res){
     let shopid=req.params.shopid;
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT shopid,productid,SUM(quantity*price) as TotalPurchase FROM purchases WHERE shopid=? GROUP BY productid";
-    connection.query(sql,shopid,function(err,result){
+    let sql=`SELECT shopid,productid,SUM(quantity*price) as TotalPurchase FROM purchases WHERE shopid=$1 GROUP BY productid,shopid`;
+    client.query(sql,[shopid],function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 
@@ -102,71 +99,70 @@ app.get("/purchases", function (req, res) {
     let product = req.query.product;
     let shop = req.query.shop;
     let sort = req.query.sort;
-    let connection = mysql.createConnection(connData);
     let conditions = [];
     let values = [];
+    let paramCount = 1;
 
     if (product) {
         let productArr = product.split(",");
-        conditions.push("productid IN (?)");
+        conditions.push(`productid = ANY($${paramCount})`);
         values.push(productArr);
+        paramCount++;
     }
 
     if (shop) {
-        conditions.push("shopid = ?");
+        conditions.push(`shopid = $${paramCount}`);
         values.push(shop);
+        paramCount++;
     }
 
-    let sql = "SELECT * FROM purchases";
-
+    let sql = `SELECT * FROM purchases`;
     if (conditions.length > 0) {
-        sql += " WHERE " + conditions.join(" AND ");
+        sql += ` WHERE ` + conditions.join(" AND ");
     }
 
     if (sort) {
         if (sort === "QtyAsc") {
-            sql += " ORDER BY quantity ASC";
+            sql += ` ORDER BY quantity ASC`;
         } else if (sort === "QtyDesc") {
-            sql += " ORDER BY quantity DESC";
+            sql += ` ORDER BY quantity DESC`;
         } else if (sort === "ValueAsc") {
-            sql += " ORDER BY price * quantity ASC";
+            sql += ` ORDER BY price * quantity ASC`;
         } else if (sort === "ValueDesc") {
-            sql += " ORDER BY price * quantity DESC";
+            sql += ` ORDER BY price * quantity DESC`;
         }
     }
 
-    connection.query(sql, values, function (err, result) {
+    console.log(sql, values);
+    client.query(sql, values, function (err, result) {
         if (err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     });
 });
 
+
 app.get("/purchases/shops/:shopid",function(req,res){
     let shopid=req.params.shopid;
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT * FROM purchases WHERE shopid=?";
-    connection.query(sql,shopid,function(err,result){
+    let sql="SELECT * FROM purchases WHERE shopid=$1";
+    client.query(sql,[shopid],function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 app.get("/purchases/products/:productid",function(req,res){
     let productid=req.params.productid;
-    let connection=mysql.createConnection(connData);
-    let sql="SELECT * FROM purchases WHERE productid=?";
-    connection.query(sql,productid,function(err,result){
+    let sql="SELECT * FROM purchases WHERE productid=$1";
+    client.query(sql,[productid],function(err,result){
         if(err) res.status(404).send("No Data Found");
-        else res.send(result);
+        else res.send(result.rows);
     })
 });
 app.post("/purchases",function(req,res){
     let body=Object.values(req.body);
-    let connection=mysql.createConnection(connData);
-    let sql="INSERT INTO purchases(shopid,productid,quantity,price) VALUES (?,?,?,?)";
-    connection.query(sql,body,function(err,result){
+    let sql="INSERT INTO purchases(shopid,productid,quantity,price) VALUES ($1,$2,$3,$4)";
+    client.query(sql,body,function(err,result){
         if(err) res.status(404).send("No Data Found");
         else res.send("Inserted Successfully !");
     })
 });
-
 
