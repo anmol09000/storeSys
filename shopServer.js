@@ -22,7 +22,7 @@ const client = new Client({
     password:"62653903220906",
     database:"postgres",
     port:5432,
-    host:"db.xmrxwivrxbqrqwcznjat.supabase.co",
+    host:"db.xqcdxuisillzeblrwavr.supabase.co",
     ssl: { rejectUnauthorized:false },
 });
 client.connect(function(err,result){
