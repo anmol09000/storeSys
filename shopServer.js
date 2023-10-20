@@ -104,15 +104,16 @@ app.get("/purchases", function (req, res) {
     let paramCount = 1;
 
     if (product) {
-        let productArr = product.split(",");
+        let productArr = product.split(",").map((a)=>a.replace("pr",""));
         conditions.push(`productid = ANY($${paramCount})`);
         values.push(productArr);
         paramCount++;
     }
 
     if (shop) {
+        let shopArr=shop.replace("st","");
         conditions.push(`shopid = $${paramCount}`);
-        values.push(shop);
+        values.push(shopArr);
         paramCount++;
     }
 
