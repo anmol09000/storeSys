@@ -69,10 +69,10 @@ app.post("/products",function(req,res){
         else res.send("Inserted Successfully !");
     })
 });
-app.get("/products/:id",function(req,res){
-    let id=req.params.id;
-    let sql=`SELECT * FROM products WHERE productid=$1`;
-    client.query(sql,[id],function(err,result){
+app.get("/products/:name",function(req,res){
+    let name=req.params.name;
+    let sql=`SELECT * FROM products WHERE productname=$1`;
+    client.query(sql,[name],function(err,result){
         if(err) res.status(404).send("No Data Found");
         else res.send(result.rows);
     })
